@@ -2,128 +2,163 @@
 #include <Keypad.h>
 #include <EEPROM.h>
 
+
+
+
+const byte COLUMNAS = 4;
+const byte FILAS = 4;
+char teclas [FILAS] [COLUMNAS] = {
+  {'1', '2', '3', 'A'},
+  {'4', '5', '6', 'B'},
+  {'7', '8', '9', 'C'},
+  {'*', '0', '#', 'D'}
+};
+byte filasPines[FILAS] = {9,8,7,6};             //define lineas
+byte columnasPines[COLUMNAS] = {5,4,3,2};       //define columnas
+Keypad miTeclado = Keypad( makeKeymap(teclas), filasPines, columnasPines, FILAS, COLUMNAS );
+
 LiquidCrystal lcd(A0, A1, 10, 11, 12, 13);
-const byte COLUMNAS= 4;
-const byte FILAS= 4;
-char teclas [FILAS] [COLUMNAS]= {{'1', '2', '3', 'A'},{'4', '5', '6', 'B'},{'7', '8', '9', 'C'},{'*', '0', '#', 'D'}};
-byte filasPines[FILAS]= {9,8,7,6}; //define lineas
-byte columnasPines[COLUMNAS]= {5,4,3,2}; //define columnas
 
-Keypad miTeclado= Keypad( makeKeymap(teclas), filasPines, columnasPines, FILAS, COLUMNAS );
-
-char codigoSecreto[6]= {'C','D','2','0','1','7'}; // aqui va el codigo secreto
+char codigoSecreto[6] = {};        // aqui va el codigo secreto. Por defecto {'C','D','2','0','1','7'}
+char codigoIngresado[6] = {};
 char pulsacion;
-int eeAddress= 0;    //necesaria para guardar la clave en memoria eeprom
-int posicion= 0;    // necesaria para la clave
-int cursor= 5;      // posicion inicial de la clave en el LCD
-int clave= 0;       // para el LCD
-int ledVerde= A2;   // pin para el LED verde
-int ledRojo= A3;    // pin para el LED rojo
-int buzzer= A4;     // pin altavoz
+byte num_caracter = 0;
+byte cursor_D = 4;      // posicion de la clave en el LCD
+boolean clave_OK = false;       //Para saber cuando se puede cambiar la clave
+byte ledVerde = A2;   // pin para el LED verde
+byte ledRojo = A3;    // pin para el LED rojo
+byte buzzer = A4;     // pin altavoz
+
+
+
 
 void setup()
 {
-Serial.begin(9600) ;
-pinMode(A0, OUTPUT);
-digitalWrite(A0, HIGH);
-pinMode(A1, OUTPUT);
-digitalWrite(A1, HIGH);
-pinMode (ledVerde, OUTPUT);
-digitalWrite(ledVerde, LOW); 
-pinMode (ledRojo, OUTPUT);
-digitalWrite(ledRojo, HIGH); 
-pinMode (buzzer, OUTPUT);
-digitalWrite(buzzer, HIGH);
-lcd.begin(16, 2);
-lcd.setCursor(0, 0);
-lcd.print("Introduzca clave");
-lcd.setCursor(4, 1);
-lcd.print(">");             
+  pinMode(A0, OUTPUT);
+  digitalWrite(A0, HIGH);
+  pinMode(A1, OUTPUT);
+  digitalWrite(A1, HIGH);
+  pinMode (ledVerde, OUTPUT);
+  digitalWrite(ledVerde, LOW); 
+  pinMode (ledRojo, OUTPUT);
+  digitalWrite(ledRojo, HIGH); 
+  pinMode (buzzer, OUTPUT);
+  digitalWrite(buzzer, HIGH);
+  Serial.begin(9600);
+  miTeclado.setDebounceTime(200);      //Para evitar rebote de tecla
+  for (int i=1; i <= 6; i++){
+      codigoSecreto[i] = EEPROM.read(i);    //Busca el pass desde la EEPROM
+  }
+  lcd.begin(16, 2);
+  lcd.setCursor(0, 0);
+  lcd.print("Introduzca clave");
+  lcd.setCursor(cursor_D, 1);
+  lcd.print(">");             
 }
+
+
+
+
+boolean comprobarPass(){
+  boolean check = true;
+  byte pos = 1;
+  while (check && (pos < 7)){
+    if (codigoIngresado[6] == codigoSecreto[6]){
+        pos++;
+    }
+    else{
+         check = false;
+    }
+  }
+  return check;
+}
+
+
+void CambiarPass()
+{
+  cursor_D = 4;
+  lcd.clear();
+  lcd.print("Ing. nuevo pass"); // escribimos en LCD
+  lcd.setCursor(4, 1);
+  lcd.print(">");
+  for (int i=1; i <= 6; i++){
+      while (!hayCaracter ()){
+      }  
+      codigoSecreto[i] = pulsacion;
+      EEPROM.write(i, pulsacion);
+      cursor_D++;
+      lcd.setCursor(cursor_D, 1);
+      lcd.print(pulsacion);
+      tone(buzzer, 350, 200);
+  }
+  lcd.setCursor(0, 0);
+  lcd.print("Nueva Clave!!!!");
+  tone(buzzer, 500, 100);
+  tone(buzzer, 600, 100);
+  tone(buzzer, 800, 100);
+  delay(4000);
+}
+
+
+char hayCaracter () {
+  pulsacion = miTeclado.getKey() ;       //Leemos pulsacion
+  if (Serial.available()>0){            //Leemos desde BlueTooth
+     pulsacion = Serial.read();
+  }
+  return pulsacion;
+}
+
+
+
 
 void loop()
-{ 
-  EEPROM.put(eeAddress, codigoSecreto);
-  pulsacion= miTeclado.getKey() ; // leemos pulsacion
-  if (Serial.available()>0){
-   pulsacion= Serial.read();
-}
- 
-      if (pulsacion != 0) //Si el valor es 0 es que no se ha pulsado ninguna tecla
-        { // descartamos numeral y asterisco
-          if (pulsacion != '#' && pulsacion != '*' && clave==0)
-           { lcd.print(pulsacion); // imprimimos pulsacion
-             cursor++;             // incrementamos el cursor
-             tone(buzzer, 350);     // tono de pulsacion
-             delay(200);
-             noTone(buzzer);
-             
-//--- Condicionales para comprobar la clave introducida -----------
-
-      // comparamos entrada con cada uno de los digitos, uno a uno
-      if (pulsacion == codigoSecreto[posicion])
-          posicion ++; // aumentamos posicion si es correcto el digito
-      if (posicion == 6)
-       { // comprobamos que se han introducido los 4 correctamente
-         digitalWrite (ledVerde, HIGH);  // encendemos LED
-         clave=1; // indicamos que se ha introducido la clave
-         lcd.clear();
-         lcd.setCursor(0,0);      // situamos el cursor el la pos 0 de la linea 0.
-         lcd.print("Clave correcta");         // escribimos en LCD
-         delay(2500);                           // tono de clave correcta
-         lcd.clear();
-         lcd.print("Bienvenido!");         // escribimos en LCD
-         tone(buzzer, 500);
-         delay(100);
-         noTone(buzzer);
-         tone(buzzer, 600);
-         delay(100);
-         noTone(buzzer);
-         tone(buzzer, 800);
-         delay(100);
-         noTone(buzzer);
-         digitalWrite(ledRojo, LOW); // apagamos el LED rojo
-         digitalWrite(ledVerde,HIGH); // encendemos el verde
-     }
-     
-//--- En el caso de que este incompleta o no hayamos acertado ----------
-     
-     if(cursor>10 && clave !=1)        // comprobamos que no pase de la cuarta posicion
-       {   lcd.clear();
-           cursor= 4;     // lo volvemos a colocar al inicio
-           posicion= 0;           // borramos clave introducida
-           lcd.setCursor(0, 0);
-           clave=0;
-           lcd.print("Clave incorrecta");       // borramos la clave de la pantalla
-           delay(2500);
-           lcd.setCursor(0, 0);
-           lcd.print("Intente otra vez");
-           digitalWrite(ledRojo, HIGH); // encendemos el LED rojo
-           lcd.setCursor(4, 1);
-           lcd.print(">");
-           if(clave == 0)         // comprobamos que no hemos acertado
-              { tone(buzzer, 70, 500); // para generar
-                delay(250); // tono de error
-                noTone(buzzer);
+{
+  if (hayCaracter()){
+      num_caracter++;
+      cursor_D++;               // incrementamos el cursor
+      lcd.setCursor(cursor_D, 1);
+      lcd.print(pulsacion);     // imprimimos el caracter ingresado
+      tone(buzzer, 350, 200);        // tono de pulsacion
+      if (num_caracter == 6){
+         if (comprobarPass()){
+              lcd.clear();
+              lcd.print("Clave correcta");
+              tone(buzzer, 500, 100);
+              tone(buzzer, 600, 100);
+              tone(buzzer, 800, 100);
+              delay(1000);
+              lcd.clear();
+              lcd.print("Bienvenido!!!!");
+              digitalWrite(ledRojo, LOW);     //Apagamos el LED rojo
+              digitalWrite(ledVerde,HIGH);    //Encendemos el verde
+              delay(4000);                  //Cuanto o qué esperamos????
+              if (hayCaracter()){
+                  if (pulsacion == '*'){
+                      CambiarPass();
+                  }
               }
-        }
-     }
-   } 
-
- //--- Condicionales para resetear clave introducida -------------
- 
- if (pulsacion == '*')
-     { // asterisco para resetear el contador
-       posicion= 0;
-       cursor= 4;
-       clave= 0;
-       posicion= 0;
-       lcd.clear();
-       lcd.setCursor(0, 0); // situamos el cursor el la posición 0 de la linea 0.
-       lcd.print("Introduzca clave"); // escribimos en LCD
-       lcd.setCursor(4, 1);
-       lcd.print(">"); // borramos de la pantalla los numeros
-       digitalWrite(ledRojo, HIGH); // encendemos el LED rojo
-       digitalWrite(ledVerde, LOW); // apagamos el verde
-    }
+              digitalWrite(ledVerde, LOW); 
+              digitalWrite(ledRojo, HIGH);
+              lcd.clear();
+              lcd.setCursor(0, 0);
+              lcd.print("Introduzca clave");
+              cursor_D = 4;
+              lcd.setCursor(cursor_D, 1);
+              lcd.print(">"); 
+         }
+         else{              
+              lcd.clear();
+              lcd.print("Clave incorrecta");  //Borramos la clave de la pantalla
+              tone(buzzer, 70, 500);          //Tono de error
+              delay(3000);
+              lcd.setCursor(0, 0);
+              lcd.print("Intente otra vez");
+              digitalWrite(ledRojo, HIGH); // encendemos el LED rojo
+              cursor_D = 4;
+              lcd.setCursor(cursor_D, 1);
+              lcd.print(">");
+         }
+      }
+  }
+  delay(250);
  }
