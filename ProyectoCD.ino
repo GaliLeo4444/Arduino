@@ -5,6 +5,7 @@
 
 
 
+volatile unsigned long incrementMilis;
 const byte COLUMNAS = 4;
 const byte FILAS = 4;
 char teclas [FILAS] [COLUMNAS] = {
@@ -18,6 +19,7 @@ byte columnasPines[COLUMNAS] = {5,4,3,2};       //define columnas
 Keypad miTeclado = Keypad( makeKeymap(teclas), filasPines, columnasPines, FILAS, COLUMNAS );
 
 LiquidCrystal lcd(A0, A1, 10, 11, 12, 13);
+
 
 char codigoSecreto[6] = {};        // aqui va el codigo secreto. Por defecto {'C','D','2','0','1','7'}
 char codigoIngresado[6] = {};
@@ -54,6 +56,42 @@ void setup()
   lcd.print("Introduzca clave");
   lcd.setCursor(cursor_D, 1);
   lcd.print(">");             
+}
+
+
+
+
+void InitTimer1(){
+  // disable global interrupts
+  cli();             
+    // initialize Timer1
+    TCCR1A = 0;     // set entire TCCR1A register to 0
+    TCCR1B = 0;     // same for TCCR1B
+    // turn on CTC mode:
+    TCCR1B |= (1 << WGM12);
+    // Set CS10 bit for no prescaler.  timertick = 62,5 nseg:
+  TCCR1B |= (1 << CS10);
+    // set compare match register to desired timer count. (15999+1) * 62,5 nseg = 1 mseg
+    OCR1A = 15999;
+  // Enable timer1 interrupt mask for compare match A
+  TIMSK1 |= (1 << OCIE1A);
+  // Enable global interrupts
+  sei(); 
+}
+
+ISR(TIMER1_COMPA_vect){
+  // Timer1 interrupt --> timeout
+  incrementMilis++;    // c/1 mseg
+  /* Cuenta la cantidad de ticks hasta 1 seg */
+}
+
+void Pausa(unsigned int tiempo) {
+  incrementMilis = 0;
+  InitTimer1();
+  while (incrementMilis < tiempo){
+  }
+  TCCR1A = 0;
+  TCCR1B = 0;
 }
 
 
@@ -160,5 +198,5 @@ void loop()
          }
       }
   }
-  delay(250);
- }
+  Pausa(250);
+}
