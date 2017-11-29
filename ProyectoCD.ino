@@ -36,6 +36,7 @@ byte buzzer = A4;     // pin altavoz
 
 void setup()
 {
+  InitTimer1();
   pinMode(A0, OUTPUT);
   digitalWrite(A0, HIGH);
   pinMode(A1, OUTPUT);
@@ -73,11 +74,10 @@ void InitTimer1(){
   TCCR1B |= (1 << CS10);
     // set compare match register to desired timer count. (15999+1) * 62,5 nseg = 1 mseg
     OCR1A = 15999;
-  // Enable timer1 interrupt mask for compare match A
-  TIMSK1 |= (1 << OCIE1A);
   // Enable global interrupts
   sei(); 
 }
+
 
 ISR(TIMER1_COMPA_vect){
   // Timer1 interrupt --> timeout
@@ -85,13 +85,29 @@ ISR(TIMER1_COMPA_vect){
   /* Cuenta la cantidad de ticks hasta 1 seg */
 }
 
+
 void Pausa(unsigned int tiempo) {
   incrementMilis = 0;
-  InitTimer1();
+  TIMSK1 |= (1 << OCIE1A);      // Enable timer1 interrupt mask for compare match A
   while (incrementMilis < tiempo){
   }
-  TCCR1A = 0;
-  TCCR1B = 0;
+  TIMSK1 &= ~(1 << OCIE1A);    //Cancelo las interrupciones y el timer se para
+}
+
+
+
+
+void GenerarTono (unsigned int tono) {
+  TCCR0A = 0;
+  TCCR0B = 0;     //poner 0 para frenar
+  TCCR0A |= (1 << COM0A0);
+  TCCR0A |= (1 << WGM00);
+  TCCR0A |= (1 << WGM01);
+  TCCR0B |= (1 << WGM02);
+  TCCR0B |= (1 << CS02) | (1 << CA01);
+
+  // Ftono = Fclock/(preescaler.256)
+  //OCR0A = 
 }
 
 
