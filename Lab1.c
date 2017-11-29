@@ -34,7 +34,7 @@ char SumaChar(char a, char b)
             return(0);
         }
     }
-    else {                  //Si son de distinto signo ò 0 no hay problema
+    else {                  //Si son de distinto signo Ã² 0 no hay problema
         return(a + b);
     }
 }
