@@ -37,6 +37,7 @@ byte buzzer = A4;     // pin altavoz
 void setup()
 {
   InitTimer1();
+  initTimer2();
   pinMode(A0, OUTPUT);
   digitalWrite(A0, HIGH);
   pinMode(A1, OUTPUT);
@@ -46,7 +47,7 @@ void setup()
   pinMode (ledRojo, OUTPUT);
   digitalWrite(ledRojo, HIGH); 
   pinMode (buzzer, OUTPUT);
-  digitalWrite(buzzer, HIGH);
+  //digitalWrite(buzzer, HIGH);
   Serial.begin(9600);
   miTeclado.setDebounceTime(200);      //Para evitar rebote de tecla
   for (int i=1; i <= 6; i++){
@@ -56,7 +57,8 @@ void setup()
   lcd.setCursor(0, 0);
   lcd.print("Introduzca clave");
   lcd.setCursor(cursor_D, 1);
-  lcd.print(">");             
+  lcd.print(">");
+  GenerarTono(800, 400);
 }
 
 
@@ -74,17 +76,17 @@ void InitTimer1(){
   TCCR1B |= (1 << CS10);
     // set compare match register to desired timer count. (15999+1) * 62,5 nseg = 1 mseg
     OCR1A = 15999;
+  // Enable timer1 interrupt mask for compare match A
+  TIMSK1 |= (1 << OCIE1A);
   // Enable global interrupts
   sei(); 
 }
-
 
 ISR(TIMER1_COMPA_vect){
   // Timer1 interrupt --> timeout
   incrementMilis++;    // c/1 mseg
   /* Cuenta la cantidad de ticks hasta 1 seg */
 }
-
 
 void Pausa(unsigned int tiempo) {
   incrementMilis = 0;
@@ -97,17 +99,27 @@ void Pausa(unsigned int tiempo) {
 
 
 
-void GenerarTono (unsigned int tono) {
+void initTimer2 () {
+  //Fast PWM Mode & OCRA top & Toggle OC2A(PB[3]) on Compare Match
   TCCR0A = 0;
-  TCCR0B = 0;     //poner 0 para frenar
-  TCCR0A |= (1 << COM0A0);
-  TCCR0A |= (1 << WGM00);
-  TCCR0A |= (1 << WGM01);
-  TCCR0B |= (1 << WGM02);
-  TCCR0B |= (1 << CS02) | (1 << CA01);
+  TCCR0B = 0;
+  TCCR0A |= (1 << COM2A0) | (1 << WGM21) | (1 << WGM20);
+  TCCR0B |= (1 << WGM22);
+}
 
-  // Ftono = Fclock/(preescaler.256)
-  //OCR0A = 
+
+void GenerarTono (unsigned int tono, unsigned int tiempo) {
+  unsigned int t = 0;
+  //Output OCR2A duty cycle: 50% siempre
+  // F.tono = F.clock/F.Preescaler/(OCR2A+1)/2
+  // F.tono = 16MHz/1024/(OCR2A+1)/2
+  //OCR2A+1 = 16MHz/(tono*2048)
+  OCR2A = byte((7812/tono)+1);
+  TCCR0B |= (1 << CS22) | (1 << CS20);
+  while (t < tiempo){
+    
+  }
+  TCCR0B &= ~(1 << CS22) | ~(1 << CS20);  //Timer/Counter stopped
 }
 
 
