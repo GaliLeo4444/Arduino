@@ -37,7 +37,7 @@ byte buzzer = A4;     // pin altavoz
 
 
 //Inicializacion USART
-void USART_Init(){
+void InitUSART(){
   cli();
   /* Set baud rate */
   UBRR0H = 0;
@@ -84,17 +84,16 @@ ISR(USART_RX_vect){
 
 
 
-void InitTimer1(){
+void InitTimer1 () {
   // disable global interrupts
   cli();             
-    // initialize Timer1
-    TCCR1A = 0;     // set entire TCCR1A register to 0
+    // Initialize Timer1
+    TCCR1A = 0;     // Set entire TCCR1A register to 0
     TCCR1B = 0;     // same for TCCR1B
-    // turn on CTC mode:
+    // Turn on CTC mode:
     TCCR1B |= (1 << WGM12);
-    // Set CS10 bit for no prescaler.  timertick = 62,5 nseg:
-  TCCR1B |= (1 << CS10);
-    // set compare match register to desired timer count. (15999+1) * 62,5 nseg = 1 mseg
+    // Timertick = 62,5 nseg:
+    // Set compare match register to desired timer count. (15999+1) * 62,5 nseg = 1 mseg
     OCR1A = 15999;
   // Enable timer1 interrupt mask for compare match A
   TIMSK1 |= (1 << OCIE1A);
@@ -102,18 +101,18 @@ void InitTimer1(){
   sei(); 
 }
 
-ISR(TIMER1_COMPA_vect){
+ISR (TIMER1_COMPA_vect) {
   // Timer1 interrupt --> timeout
   incrementMilis++;    // c/1 mseg
   /* Cuenta la cantidad de ticks hasta 1 seg */
 }
 
-void Pausa(unsigned int tiempo) {
-  incrementMilis = 0;
-  TIMSK1 |= (1 << OCIE1A);      // Enable timer1 interrupt mask for compare match A
-  while (incrementMilis < tiempo){
+void Pausa (unsigned int tiempo) {
+  increment_mseg = 0;
+  TCCR1B |= (1 << CS10);          // Set CS10 bit for no prescaler (clk/1)
+  while (increment_mseg < tiempo){
   }
-  TIMSK1 &= ~(1 << OCIE1A);    //Cancelo las interrupciones y el timer se para
+  TCCR1B &= ~(1 << CS10);         //Timer/Counter stopped
 }
 
 
@@ -129,17 +128,14 @@ void initTimer2 () {
 
 
 void GenerarTono (unsigned int tono, unsigned int tiempo) {
-  unsigned int t = 0;
   //Output OCR2A duty cycle: 50% siempre
   // F.tono = F.clock/F.Preescaler/(OCR2A+1)/2
   // F.tono = 16MHz/1024/(OCR2A+1)/2
   //OCR2A+1 = 16MHz/(tono*2048)
   OCR2A = byte((7812/tono)+1);
-  TCCR2B |= (1 << CS22) | (1 << CS20);
-  while (t < tiempo){
-    
-  }
-  TCCR2B &= ~(1 << CS22) | ~(1 << CS20);  //Timer/Counter stopped
+  TCCR2B |= (1 << CS22) | (1 << CS21) | (1 << CS20);    //Prescaler
+  Pausa(tiempo);
+  TCCR2B &= ~(1 << CS22) | ~(1 << CS21) | ~(1 << CS20);  //Timer/Counter stopped
 }
 
 
@@ -191,7 +187,7 @@ void CambiarPass()
 
 void setup()
 {
-  USART_Init();
+  InitUSART();
   InitTimer1();
   initTimer2();
   pinMode(A0, OUTPUT);
